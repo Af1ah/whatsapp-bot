@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3002; // Changed to 3002 to avoid conflicts
 
 // Configuration
-const AI_API_URL = process.env.AI_API_URL || "http://localhost:3000/api/whatsapp";
+const AI_API_URL = process.env.AI_API_URL || "admin-dash.webvantic.studio/api/whatsapp";
 const TYPING_DELAY = 2000; // 2 seconds typing indicator
 
 console.log("🔧 Configuration:");
