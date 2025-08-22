@@ -1,33 +1,24 @@
 {
-  "name": "whatsapp-ai-bot",
+  "name": "whatsapp-bot-termux",
   "version": "1.0.0",
-  "description": "WhatsApp bot connected to Gemini AI chatbot",
-  "main": "whatsapp-bot.js",
+  "description": "WhatsApp bot for Termux using Baileys",
+  "main": "bot.js",
   "scripts": {
-    "start": "node whatsapp-bot.js",
-    "dev": "nodemon whatsapp-bot.js",
-    "clean": "rm -rf .wwebjs_auth .wwebjs_cache"
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
   },
+  "keywords": ["whatsapp", "bot", "termux", "baileys"],
+  "author": "Your Name",
+  "license": "ISC",
   "dependencies": {
-    "whatsapp-web.js": "^1.23.0",
-    "qrcode-terminal": "^0.12.0",
-    "express": "^4.18.2",
-    "axios": "^1.6.0",
-    "puppeteer": "^21.5.0"
+    "@whiskeysockets/baileys": "^6.7.8",
+    "@hapi/boom": "^10.0.1",
+    "axios": "^1.7.3",
+    "express": "^4.19.2",
+    "pino": "^9.3.2",
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "ai",
-    "gemini",
-    "chatbot"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+    "nodemon": "^3.1.4"
+  }
 }

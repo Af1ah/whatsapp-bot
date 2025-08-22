@@ -1,0 +1,589 @@
+🔧 Configuration:
+- AI API URL: admin-dash.webvantic.studio/api/whatsapp
+- Typing delay: 2000ms
+- Message batch delay: 15000ms
+- Port: 3002
+🚀 Starting WhatsApp client for Termux...
+🔄 Connection attempt 1/10
+❌ Uncaught Exception: Error: listen EADDRINUSE: address already in use :::3002
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at app.listen (/data/data/com.termux/files/home/whatsapp-bot/node_modules/express/lib/application.js:635:24)
+    at Object.<anonymous> (/data/data/com.termux/files/home/whatsapp-bot/whatsapp-bot.js:568:5)
+    at Module._compile (node:internal/modules/cjs/loader:1738:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1871:10)
+    at Module.load (node:internal/modules/cjs/loader:1470:32)
+    at Module._load (node:internal/modules/cjs/loader:1290:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3002
+}
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+📱 Received message from 918590315575: "Hu"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755794717326",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hu"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Hi! I'm Alex from Aflah's team. How can I help you with your web development needs today?...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Do you remain me?"
+📝 Added message to batch for 918590315575. Total: 1
+📱 Received message from 918590315575: "Hy"
+📝 Added message to batch for 918590315575. Total: 2
+📱 Received message from 918590315575: "Are you there"
+📝 Added message to batch for 918590315575. Total: 3
+🔄 Processing 3 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755794759547",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "User sent 3 messages in sequence:\n\nMessage 1: Do you remain me?\n\nMessage 2: Hy\n\nMessage 3: Are you there\n\nPlease provide one comprehensive response addressing all the messages above."
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Yes, I remember you, Aflah! I'm here and ready to help. How can I assist you with your web developme...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Okey"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755795086176",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Okey"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Great! What can I help you with regarding web development, pricing, or a consultation for your websi...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "I love you 😘😘"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+📱 Received message from 918590315575: "I really like you 😻"
+📝 Added message to batch for 918590315575. Total: 1
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755795600348",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I love you 😘😘"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Thank you! I'm here to help you with your web development needs. What can I assist you with regardin...
+✅ Batched response sent successfully
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755795615676",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I really like you 😻"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: I appreciate that! My purpose is to help you with your web development needs. How can I assist you w...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "How many languages did you know?"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755795804365",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "How many languages did you know?"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: I'm designed to understand and respond in English to help you with your web development needs. How c...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Ninakk enne ariyumo?"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755796201337",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Ninakk enne ariyumo?"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: I'm designed to understand and respond in English to help you with your web development needs. How c...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Can I know your pricing"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755796248518",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Can I know your pricing"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Certainly! Here are our core service prices: * **Basic Website:** ₹3999 (includes 5 sections, respon...
+✅ Batched response sent successfully
+📱 Received message from 917025906686: "Hi"
+📝 Added message to batch for 917025906686. Total: 1
+🔄 Processing 1 batched messages from 917025906686
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_917025906686@s.whatsapp.net_1755800223010",
+  "phoneNumber": "917025906686",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Hi! I'm Alex from Aflah's team. How can I help?...
+✅ Batched response sent successfully
+📱 Received message from 917025906686: "What's your name"
+📝 Added message to batch for 917025906686. Total: 1
+🔄 Processing 1 batched messages from 917025906686
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_917025906686@s.whatsapp.net_1755800261806",
+  "phoneNumber": "917025906686",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What's your name"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: I'm Alex, a support bot for Aflah's Web Development. How can I assist you today?...
+✅ Batched response sent successfully
+📱 Received message from 917025906686: "Which"
+📝 Added message to batch for 917025906686. Total: 1
+📱 Received message from 917025906686: "Price?"
+📝 Added message to batch for 917025906686. Total: 2
+🔄 Processing 2 batched messages from 917025906686
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_917025906686@s.whatsapp.net_1755800342457",
+  "phoneNumber": "917025906686",
+  "messages": [
+    {
+      "role": "user",
+      "content": "User sent 2 messages in sequence:\n\nMessage 1: Which\n\nMessage 2: Price?\n\nPlease provide one comprehensive response addressing all the messages above."
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: To help me give you the right price, could you tell me what kind of website or service you're intere...
+✅ Batched response sent successfully
+📱 Received message from 917025906686: "E commerce store"
+📝 Added message to batch for 917025906686. Total: 1
+🔄 Processing 1 batched messages from 917025906686
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_917025906686@s.whatsapp.net_1755800380045",
+  "phoneNumber": "917025906686",
+  "messages": [
+    {
+      "role": "user",
+      "content": "E commerce store"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: An E-commerce website starts at ₹5999. This includes a product catalog, shopping cart, and payment g...
+✅ Batched response sent successfully
+📱 Received message from 917025906686: "Hosting cost?"
+📝 Added message to batch for 917025906686. Total: 1
+
+🛑 Bot shutting down...
+🔧 Configuration:
+- AI API URL: admin-dash.webvantic.studio/api/whatsapp
+- Typing delay: 2000ms
+- Message batch delay: 5000ms
+- Port: 3002
+📂 Loaded 0 pending messages
+⏰ Loaded 2 user timers
+🚀 Starting WhatsApp client for Termux...
+🔄 Connection attempt 1/10
+❌ Uncaught Exception: Error: listen EADDRINUSE: address already in use :::3002
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at app.listen (/data/data/com.termux/files/home/whatsapp-bot/node_modules/express/lib/application.js:635:24)
+    at Object.<anonymous> (/data/data/com.termux/files/home/whatsapp-bot/whatsapp-bot.js:568:5)
+    at Module._compile (node:internal/modules/cjs/loader:1738:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1871:10)
+    at Module.load (node:internal/modules/cjs/loader:1470:32)
+    at Module._load (node:internal/modules/cjs/loader:1290:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3002
+}
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+📱 Received message from 918590315575: "I need a freelance website with chat bot."
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755800747359",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I need a freelance website with chat bot."
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Great! A freelance website sounds like a Portfolio type, which starts at ₹3999. For the chatbot, we ...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "I only needs basic ones"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755800790685",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I only needs basic ones"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Okay, so for a freelance (portfolio) website with a Basic AI Bot, the total would be: * **Portfolio ...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Okey fine"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755800836439",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Okey fine"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Great! If you're ready to move forward or would like to discuss the project details further, I can c...
+✅ Batched response sent successfully
+📱 Received message from 918590315575: "Yes"
+📝 Added message to batch for 918590315575. Total: 1
+🔄 Processing 1 batched messages from 918590315575
+🚀 Calling AI API with payload: {
+  "id": "whatsapp_918590315575@s.whatsapp.net_1755800885743",
+  "phoneNumber": "918590315575",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Yes"
+    }
+  ]
+}
+✅ AI API response status: 200
+✅ Final extracted response: Excellent! Let me connect you with Aflah to discuss the next steps for your freelance website with a...
+✅ Batched response sent successfully
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 2/10)
+🔄 Connection attempt 3/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 3/10)
+🔄 Connection attempt 4/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 4/10)
+🔄 Connection attempt 5/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 5/10)
+🔄 Connection attempt 6/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 6/10)
+🔄 Connection attempt 7/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 7/10)
+🔄 Connection attempt 8/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 8/10)
+🔄 Connection attempt 9/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 9/10)
+🔄 Connection attempt 10/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 10/10)
+🔄 Connection attempt 11/10
+🔄 Connecting to WhatsApp...
+🔌 Connection closed: {
+  reason: 'WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)',
+  statusCode: 408,
+  willReconnect: true
+}
+❌ Max reconnection attempts reached
+🔧 Configuration:
+- AI API URL: admin-dash.webvantic.studio/api/whatsapp
+- Typing delay: 2000ms
+- Message batch delay: 5000ms
+- Port: 3002
+📂 Loaded 0 pending messages
+⏰ Loaded 2 user timers
+🚀 Starting WhatsApp client for Termux...
+🔄 Connection attempt 1/10
+🚀 WhatsApp bot server listening on port 3002
+🔗 Health check: http://localhost:3002/health
+📊 Stats: http://localhost:3002/stats
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}
+🔌 Connection closed: {
+  reason: 'Connection Terminated',
+  statusCode: 428,
+  willReconnect: true
+}
+🔄 Reconnecting in 5 seconds... (Attempt 1/10)
+🔄 Connection attempt 2/10
+🔄 Connecting to WhatsApp...
+✅ WhatsApp bot is ready!
+🤖 Bot info: {
+  id: '919495410343:5@s.whatsapp.net',
+  lid: '150114005966954:5@lid',
+  name: 'Webvantic Support Team'
+}

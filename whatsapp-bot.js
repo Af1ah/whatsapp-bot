@@ -1,65 +1,142 @@
-const { Client } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
-const express = require("express");
-const axios = require("axios");
+const { 
+  default: makeWASocket,
+  DisconnectReason,
+  useMultiFileAuthState,
+  downloadContentFromMessage
+} = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const pino = require('pino');
+const express = require('express');
+const axios = require('axios');
+const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3002; // Changed to 3002 to avoid conflicts
+const PORT = process.env.PORT || 3002;
 
 // Configuration
 const AI_API_URL = process.env.AI_API_URL || "admin-dash.webvantic.studio/api/whatsapp";
 const TYPING_DELAY = 2000; // 2 seconds typing indicator
+const MESSAGE_BATCH_DELAY = 5000; // 15 seconds delay for batched messages
+const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_DELAY = 5000;
 
 console.log("🔧 Configuration:");
 console.log("- AI API URL:", AI_API_URL);
 console.log("- Typing delay:", TYPING_DELAY + "ms");
+console.log("- Message batch delay:", MESSAGE_BATCH_DELAY + "ms");
 console.log("- Port:", PORT);
 
-// WhatsApp Client with session support
-const client = new Client({
-  authStrategy: new (require('whatsapp-web.js').LocalAuth)({
-    clientId: "whatsapp-ai-bot"
-  }),
-  puppeteer: {
-    headless: false, // Set to false for debugging
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor'
-    ]
-  },
-  webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+// Create necessary directories
+const AUTH_DIR = './auth_info_baileys';
+const DATA_DIR = './bot_data';
+const PENDING_MESSAGES_FILE = path.join(DATA_DIR, 'pending_messages.json');
+const USER_TIMERS_FILE = path.join(DATA_DIR, 'user_timers.json');
+
+[AUTH_DIR, DATA_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-// Utility function to generate chat ID
+// Logger configuration
+const logger = pino({
+  level: 'warn'
+});
+
+let sock;
+let qrGenerated = false;
+let reconnectAttempts = 0;
+let isConnected = false;
+
+// Persistent data structures
+let pendingMessages = new Map();
+let userMessageTimers = new Map();
+let processedMessages = new Set();
+let processingLock = new Set();
+
+// Load persistent data on startup
+function loadPersistentData() {
+  try {
+    // Load pending messages
+    if (fs.existsSync(PENDING_MESSAGES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PENDING_MESSAGES_FILE, 'utf8'));
+      pendingMessages = new Map(data);
+      console.log(`📂 Loaded ${pendingMessages.size} pending messages`);
+    }
+
+    // Load user timers
+    if (fs.existsSync(USER_TIMERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(USER_TIMERS_FILE, 'utf8'));
+      userMessageTimers = new Map(Object.entries(data));
+      console.log(`⏰ Loaded ${userMessageTimers.size} user timers`);
+    }
+  } catch (error) {
+    console.error('❌ Error loading persistent data:', error.message);
+  }
+}
+
+// Save persistent data
+function savePersistentData() {
+  try {
+    // Save pending messages
+    const pendingData = Array.from(pendingMessages.entries());
+    fs.writeFileSync(PENDING_MESSAGES_FILE, JSON.stringify(pendingData, null, 2));
+
+    // Save user timers (convert Map values to serializable format)
+    const timerData = {};
+    userMessageTimers.forEach((value, key) => {
+      if (value && typeof value === 'object') {
+        timerData[key] = {
+          timeout: null, // Don't save timeout objects
+          messages: value.messages || [],
+          lastMessageTime: value.lastMessageTime || Date.now()
+        };
+      }
+    });
+    fs.writeFileSync(USER_TIMERS_FILE, JSON.stringify(timerData, null, 2));
+  } catch (error) {
+    console.error('❌ Error saving persistent data:', error.message);
+  }
+}
+
+// Auto-save every 30 seconds
+setInterval(savePersistentData, 30000);
+
+// Save on exit
+process.on('SIGINT', () => {
+  console.log('\n🛑 Bot shutting down...');
+  savePersistentData();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Bot shutting down...');
+  savePersistentData();
+  process.exit(0);
+});
+
+// Utility functions
 function generateChatId(phoneNumber) {
   return `whatsapp_${phoneNumber}_${Date.now()}`;
 }
 
-// Utility function to clean phone number
 function cleanPhoneNumber(phoneNumber) {
-  return phoneNumber.replace(/[@c.us]/g, '').replace(/\D/g, '');
+  return phoneNumber.replace(/[@s.whatsapp.net]/g, '').replace(/\D/g, '');
 }
 
-// Function to show typing indicator
-async function showTyping(message, duration = TYPING_DELAY) {
+async function showTyping(jid, duration = TYPING_DELAY) {
   try {
-    const chat = await message.getChat();
-    await chat.sendStateTyping();
+    if (!isConnected || !sock) return;
+    await sock.sendPresenceUpdate('composing', jid);
     
     return new Promise(resolve => {
       setTimeout(async () => {
         try {
-          await chat.clearState();
+          if (isConnected && sock) {
+            await sock.sendPresenceUpdate('paused', jid);
+          }
           resolve();
         } catch (error) {
           console.error("❌ Error clearing typing state:", error.message);
@@ -72,9 +149,20 @@ async function showTyping(message, duration = TYPING_DELAY) {
   }
 }
 
-// Function to call AI API with improved response filtering
-async function getAIResponse(userMessage, phoneNumber) {
+// Enhanced AI API call with batched messages
+async function getAIResponse(messages, phoneNumber) {
   const chatId = generateChatId(phoneNumber);
+  
+  // Combine multiple messages into one context
+  let combinedMessage = '';
+  if (Array.isArray(messages) && messages.length > 1) {
+    combinedMessage = messages.map((msg, index) => 
+      `Message ${index + 1}: ${msg}`
+    ).join('\n\n');
+    combinedMessage = `User sent ${messages.length} messages in sequence:\n\n${combinedMessage}\n\nPlease provide one comprehensive response addressing all the messages above.`;
+  } else {
+    combinedMessage = Array.isArray(messages) ? messages[0] : messages;
+  }
   
   const payload = {
     id: chatId,
@@ -82,7 +170,7 @@ async function getAIResponse(userMessage, phoneNumber) {
     messages: [
       {
         role: "user",
-        content: userMessage
+        content: combinedMessage
       }
     ]
   };
@@ -90,7 +178,7 @@ async function getAIResponse(userMessage, phoneNumber) {
   console.log("🚀 Calling AI API with payload:", JSON.stringify(payload, null, 2));
 
   try {
-    const response = await axios.post(AI_API_URL, payload, {
+    const response = await axios.post(`https://${AI_API_URL}`, payload, {
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "WhatsApp-Bot/1.0"
@@ -100,260 +188,312 @@ async function getAIResponse(userMessage, phoneNumber) {
     });
 
     console.log("✅ AI API response status:", response.status);
-    console.log("📥 Raw response data:", response.data);
 
-    // Parse streaming response - improved parsing for the specific format
+    // Parse streaming response
     let fullResponse = '';
     const lines = response.data.split('\n');
     
     for (const line of lines) {
       const trimmedLine = line.trim();
-      console.log("🔍 Processing line:", trimmedLine);
       
-      // Parse format like: 0:"Hello world" or any number:"content"
       const textMatch = trimmedLine.match(/^\d+:"(.*)"/);
       if (textMatch && textMatch[1]) {
         let text = textMatch[1];
         
-        // Unescape the text properly
         text = text
-          .replace(/\\"/g, '"')     // Fix escaped quotes
-          .replace(/\\n/g, '\n')   // Fix newlines
-          .replace(/\\\\/g, '\\')  // Fix escaped backslashes
-          .replace(/\\'/g, "'");   // Fix escaped single quotes
+          .replace(/\\"/g, '"')
+          .replace(/\\n/g, '\n')
+          .replace(/\\\\/g, '\\')
+          .replace(/\\'/g, "'");
         
-        console.log("✅ Extracted text:", text);
         fullResponse += text;
-      }
-      
-      // Skip lines that start with 'e:' or 'd:' (metadata)
-      if (trimmedLine.startsWith('e:') || trimmedLine.startsWith('d:')) {
-        console.log("⏭️ Skipping metadata line");
-        continue;
       }
     }
 
-    // Clean up the final response
     fullResponse = fullResponse
       .trim()
-      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
-      .replace(/\n\s*\n/g, '\n'); // Remove empty lines
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n/g, '\n');
 
     if (fullResponse && fullResponse.length > 0) {
-      console.log("✅ Final extracted response:", fullResponse);
+      console.log("✅ Final extracted response:", fullResponse.substring(0, 100) + "...");
       return fullResponse;
     }
 
-    // Enhanced fallback: try to extract any content from numbered lines
-    console.log("⚠️ Primary parsing failed, trying fallback...");
-    const fallbackLines = response.data.split('\n');
-    let fallbackResponse = '';
-    
-    for (const line of fallbackLines) {
-      const trimmedLine = line.trim();
-      // Look for any line that starts with a number and colon, then extract quoted content
-      const fallbackMatch = trimmedLine.match(/^\d+:"([^"]+)"/);
-      if (fallbackMatch && fallbackMatch[1]) {
-        fallbackResponse += fallbackMatch[1] + ' ';
-      }
-    }
-    
-    fallbackResponse = fallbackResponse.trim();
-    
-    if (fallbackResponse && fallbackResponse.length > 3) {
-      console.log("✅ Using fallback response:", fallbackResponse);
-      return fallbackResponse;
-    }
-
-    // Final fallback
-    console.log("⚠️ All parsing methods failed, using default response");
     return "I'm here to help! Please ask me anything.";
 
   } catch (error) {
-    console.error("❌ AI API Error Details:");
-    console.error("- Message:", error.message);
-    console.error("- Code:", error.code);
-    
-    if (error.response) {
-      console.error("- Status:", error.response.status);
-      console.error("- Status Text:", error.response.statusText);
-      console.error("- Response data:", error.response.data);
-    }
-    
-    // Return a more specific error message based on the error type
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error("AI service is not running or unreachable");
-    } else if (error.code === 'ENOTFOUND') {
-      throw new Error("Cannot resolve AI service hostname");
-    } else if (error.response && error.response.status === 404) {
-      throw new Error("AI service endpoint not found");
-    } else if (error.response && error.response.status >= 500) {
-      throw new Error("AI service internal error");
-    }
-    
+    console.error("❌ AI API Error:", error.message);
     throw error;
   }
 }
 
-// WhatsApp Event Handlers with more detailed logging
-client.on("qr", qr => {
-  console.log("📱 Scan this QR code to log in:");
-  qrcode.generate(qr, { small: true });
-  console.log("⏳ Waiting for QR scan...");
-});
-
-client.on("ready", () => {
-  console.log("✅ WhatsApp bot is ready!");
-  console.log("🔗 AI API URL:", AI_API_URL);
-  console.log("📱 Bot Info:", client.info);
-});
-
-client.on("authenticated", () => {
-  console.log("🔐 WhatsApp client authenticated successfully");
-});
-
-client.on("auth_failure", msg => {
-  console.error("❌ Authentication failed:", msg);
-});
-
-client.on("disconnected", (reason) => {
-  console.log("🔌 WhatsApp client disconnected:", reason);
-  console.log("🔄 Attempting to reconnect...");
-});
-
-client.on("loading_screen", (percent, message) => {
-  console.log("⏳ Loading screen:", percent, message);
-});
-
-// Track processed messages to avoid duplicates
-const processedMessages = new Set();
-const processingLock = new Set(); // Add processing lock to prevent concurrent processing
-
-// Handle incoming messages - extracted to separate function
-async function handleIncomingMessage(message) {
-  try {
-    // Create more robust unique message ID
-    const messageId = `${message.from}_${message.timestamp}_${message.id?.id || 'no-id'}_${message.body?.substring(0, 50)}`;
-    
-    // Check if already processed
-    if (processedMessages.has(messageId)) {
-      console.log("🔄 Duplicate message detected, skipping...");
-      return;
-    }
-    
-    // Check if currently being processed
-    if (processingLock.has(messageId)) {
-      console.log("⏳ Message already being processed, skipping...");
-      return;
-    }
-    
-    // Add to processing lock
-    processingLock.add(messageId);
-    
-    console.log("🔍 Processing message:", {
-      from: message.from,
-      body: message.body,
-      type: message.type,
-      isStatus: message.isStatus,
-      fromMe: message.fromMe,
-      messageId: messageId,
-      timestamp: message.timestamp
+// Message batching system
+function addMessageToBatch(jid, messageContent) {
+  const now = Date.now();
+  
+  if (!userMessageTimers.has(jid)) {
+    userMessageTimers.set(jid, {
+      timeout: null,
+      messages: [],
+      lastMessageTime: now
     });
+  }
+  
+  const timerData = userMessageTimers.get(jid);
+  
+  // Clear existing timeout
+  if (timerData.timeout) {
+    clearTimeout(timerData.timeout);
+  }
+  
+  // Add message to batch
+  timerData.messages.push(messageContent);
+  timerData.lastMessageTime = now;
+  
+  console.log(`📝 Added message to batch for ${cleanPhoneNumber(jid)}. Total: ${timerData.messages.length}`);
+  
+  // Set new timeout
+  timerData.timeout = setTimeout(async () => {
+    await processBatchedMessages(jid);
+  }, MESSAGE_BATCH_DELAY);
+  
+  userMessageTimers.set(jid, timerData);
+}
 
-    // Skip if message is from status broadcast or empty
-    if (message.isStatus || !message.body || message.body.trim() === '') {
-      console.log("⏭️ Skipping: status broadcast or empty message");
-      processingLock.delete(messageId);
+async function processBatchedMessages(jid) {
+  try {
+    const timerData = userMessageTimers.get(jid);
+    if (!timerData || timerData.messages.length === 0) {
       return;
     }
-
-    // Skip if message is from a group (optional)
-    const chat = await message.getChat();
-    if (chat.isGroup) {
-      console.log("👥 Skipping group message");
-      processingLock.delete(messageId);
-      return;
-    }
-
-    const phoneNumber = message.from;
-    const userMessage = message.body.trim();
-    const cleanPhone = cleanPhoneNumber(phoneNumber);
-
-    console.log(`📱 Processing message from ${cleanPhone}: "${userMessage}"`);
-
+    
+    const messages = [...timerData.messages];
+    const cleanPhone = cleanPhoneNumber(jid);
+    
+    console.log(`🔄 Processing ${messages.length} batched messages from ${cleanPhone}`);
+    
+    // Clear the batch
+    timerData.messages = [];
+    timerData.timeout = null;
+    userMessageTimers.set(jid, timerData);
+    
     // Show typing indicator
-    console.log("⌨️ Showing typing indicator...");
-    await showTyping(message);
-
+    await showTyping(jid);
+    
     try {
-      // Get AI response
-      console.log("🤖 Getting AI response...");
-      const aiResponse = await getAIResponse(userMessage, phoneNumber);
+      // Get AI response for all messages
+      const aiResponse = await getAIResponse(messages, jid);
       
-      console.log("💬 AI Response:", aiResponse.substring(0, 100) + "...");
-
-      // Send response
-      await message.reply(aiResponse);
-      console.log("✅ Message sent successfully");
-
-      // Mark as processed after successful send
-      processedMessages.add(messageId);
-      
-      // Clean up old processed messages (keep last 100)
-      if (processedMessages.size > 100) {
-        const entries = Array.from(processedMessages);
-        entries.slice(0, 50).forEach(entry => processedMessages.delete(entry));
+      // Send response if connected
+      if (isConnected && sock) {
+        await sock.sendMessage(jid, { text: aiResponse });
+        console.log("✅ Batched response sent successfully");
+      } else {
+        // Store as pending if not connected
+        addToPendingMessages(jid, aiResponse);
       }
-
+      
     } catch (aiError) {
-      console.error("❌ AI Error:", aiError.message);
+      console.error("❌ AI Error for batched messages:", aiError.message);
       
-      let errorMessage = "Sorry, I'm having trouble processing your request right now. Please try again in a moment.";
+      let errorMessage = "Sorry, I'm having trouble processing your messages right now. Please try again in a moment.";
       
-      if (aiError.code === 'ECONNREFUSED') {
-        errorMessage = "🔧 AI service is currently unavailable. Please try again later.";
-      } else if (aiError.response && aiError.response.status === 401) {
-        errorMessage = "🔐 Authentication issue with AI service.";
-      } else if (aiError.code === 'ENOTFOUND') {
-        errorMessage = "🌐 Cannot connect to AI service. Please check the connection.";
+      if (isConnected && sock) {
+        await sock.sendMessage(jid, { text: errorMessage });
+      } else {
+        addToPendingMessages(jid, errorMessage);
       }
-      
-      await message.reply(errorMessage);
-      // Mark as processed even if error to prevent retry loops
-      processedMessages.add(messageId);
     }
-
+    
   } catch (error) {
-    console.error("❌ Message handling error:", error);
-    try {
-      await message.reply("Sorry, an unexpected error occurred. Please try again.");
-    } catch (replyError) {
-      console.error("❌ Failed to send error message:", replyError);
-    }
-  } finally {
-    // Always remove from processing lock
-    const messageId = `${message.from}_${message.timestamp}_${message.id?.id || 'no-id'}_${message.body?.substring(0, 50)}`;
-    processingLock.delete(messageId);
+    console.error("❌ Error processing batched messages:", error);
   }
 }
 
-// ONLY use message_create event to prevent duplicates
-client.on("message_create", async message => {
-  // Only process messages sent TO the bot (not from the bot)
-  if (message.fromMe) {
-    return; // Skip outgoing messages silently
+// Pending messages system for offline resilience
+function addToPendingMessages(jid, message) {
+  if (!pendingMessages.has(jid)) {
+    pendingMessages.set(jid, []);
+  }
+  pendingMessages.get(jid).push({
+    message: message,
+    timestamp: Date.now()
+  });
+  console.log(`📤 Added pending message for ${cleanPhoneNumber(jid)}`);
+  savePersistentData();
+}
+
+async function sendPendingMessages() {
+  if (pendingMessages.size === 0) return;
+  
+  console.log(`📬 Sending ${pendingMessages.size} pending messages...`);
+  
+  for (const [jid, messages] of pendingMessages.entries()) {
+    try {
+      for (const msgData of messages) {
+        if (isConnected && sock) {
+          await sock.sendMessage(jid, { text: msgData.message });
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay between messages
+        }
+      }
+      console.log(`✅ Sent ${messages.length} pending messages to ${cleanPhoneNumber(jid)}`);
+    } catch (error) {
+      console.error(`❌ Failed to send pending messages to ${cleanPhoneNumber(jid)}:`, error.message);
+      continue; // Continue with next user
+    }
   }
   
-  console.log("📨 Message detected via message_create event");
-  await handleIncomingMessage(message);
-});
+  // Clear pending messages after sending
+  pendingMessages.clear();
+  savePersistentData();
+}
 
-// Initialize WhatsApp client
-console.log("🚀 Starting WhatsApp client...");
-console.log("🔧 Debug mode: Browser window will be visible");
-client.initialize();
+// Handle incoming messages with batching
+async function handleIncomingMessage(msg) {
+  try {
+    const messageId = `${msg.key.remoteJid}_${msg.messageTimestamp}_${msg.key.id}`;
+    
+    if (processedMessages.has(messageId)) {
+      return;
+    }
+    
+    if (processingLock.has(messageId)) {
+      return;
+    }
+    
+    const messageContent = msg.message?.conversation || 
+                          msg.message?.extendedTextMessage?.text ||
+                          msg.message?.imageMessage?.caption ||
+                          '';
+    
+    // Skip if message is from bot itself, empty, or from group
+    if (msg.key.fromMe || !messageContent || messageContent.trim() === '' || msg.key.remoteJid.endsWith('@g.us')) {
+      return;
+    }
+    
+    const phoneNumber = msg.key.remoteJid;
+    const userMessage = messageContent.trim();
+    const cleanPhone = cleanPhoneNumber(phoneNumber);
+    
+    console.log(`📱 Received message from ${cleanPhone}: "${userMessage}"`);
+    
+    // Add to message batch instead of processing immediately
+    addMessageToBatch(phoneNumber, userMessage);
+    
+    // Mark as processed
+    processedMessages.add(messageId);
+    
+    // Clean up old processed messages
+    if (processedMessages.size > 200) {
+      const entries = Array.from(processedMessages);
+      entries.slice(0, 100).forEach(entry => processedMessages.delete(entry));
+    }
+    
+  } catch (error) {
+    console.error("❌ Message handling error:", error);
+  }
+}
 
-// Express server for health checks
+// Enhanced connection management
+async function connectToWhatsApp() {
+  try {
+    console.log(`🔄 Connection attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+    
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    
+    sock = makeWASocket({
+      logger,
+      printQRInTerminal: false,
+      auth: state,
+      defaultQueryTimeoutMs: 60 * 1000,
+      generateHighQualityLinkPreview: true,
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      browser: ["WhatsApp Bot", "Chrome", "1.0.0"],
+      keepAliveIntervalMs: 30000, // Send keep-alive every 30 seconds
+      connectTimeoutMs: 60000, // 60 seconds connection timeout
+      emitOwnEvents: false, // Don't emit events for own messages
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      
+      if (qr && !qrGenerated) {
+        console.log("📱 Scan this QR code to log in:");
+        qrcode.generate(qr, { small: true });
+        qrGenerated = true;
+        console.log("⏳ Waiting for QR scan...");
+      }
+      
+      if (connection === 'close') {
+        isConnected = false;
+        qrGenerated = false;
+        
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        
+        console.log('🔌 Connection closed:', {
+          reason: lastDisconnect?.error?.output?.payload?.message || 'Unknown',
+          statusCode: statusCode,
+          willReconnect: shouldReconnect
+        });
+        
+        if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++;
+          console.log(`🔄 Reconnecting in ${RECONNECT_DELAY/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+          setTimeout(connectToWhatsApp, RECONNECT_DELAY);
+        } else if (statusCode === DisconnectReason.loggedOut) {
+          console.log('❌ Logged out, please restart the bot and scan QR again');
+          process.exit(1);
+        } else {
+          console.log('❌ Max reconnection attempts reached');
+          process.exit(1);
+        }
+      } else if (connection === 'open') {
+        isConnected = true;
+        reconnectAttempts = 0;
+        qrGenerated = false;
+        
+        console.log('✅ WhatsApp bot is ready!');
+        console.log('🤖 Bot info:', sock.user);
+        
+        // Send pending messages after connection
+        setTimeout(sendPendingMessages, 2000);
+      } else if (connection === 'connecting') {
+        console.log('🔄 Connecting to WhatsApp...');
+      }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return;
+      
+      for (const message of messages) {
+        await handleIncomingMessage(message);
+      }
+    });
+
+    // Handle connection errors
+    sock.ev.on('error', (error) => {
+      console.error('🚨 Socket error:', error);
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to create WhatsApp connection:', error);
+    
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      reconnectAttempts++;
+      setTimeout(connectToWhatsApp, RECONNECT_DELAY);
+    } else {
+      console.log('❌ Max connection attempts reached');
+      process.exit(1);
+    }
+  }
+}
+
+// Express server for monitoring and control
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -361,28 +501,78 @@ app.get("/", (req, res) => {
     status: "✅ WhatsApp bot server running",
     aiApiUrl: AI_API_URL,
     timestamp: new Date().toISOString(),
-    port: PORT
+    port: PORT,
+    platform: "Termux/Baileys",
+    connected: isConnected,
+    pendingMessages: pendingMessages.size,
+    activeTimers: userMessageTimers.size,
+    reconnectAttempts: reconnectAttempts
   });
 });
 
 app.get("/health", (req, res) => {
   res.json({
     status: "healthy",
-    whatsappReady: client.info !== null,
+    whatsappReady: isConnected,
+    botUser: sock?.user || null,
     timestamp: new Date().toISOString()
   });
 });
 
-// Error handling for uncaught exceptions
+app.get("/stats", (req, res) => {
+  res.json({
+    connected: isConnected,
+    pendingMessages: pendingMessages.size,
+    activeMessageTimers: userMessageTimers.size,
+    processedMessages: processedMessages.size,
+    reconnectAttempts: reconnectAttempts,
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage()
+  });
+});
+
+// Manual trigger endpoints
+app.post("/send-pending", async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: "Bot not connected" });
+  }
+  
+  await sendPendingMessages();
+  res.json({ message: "Pending messages sent" });
+});
+
+app.post("/reconnect", (req, res) => {
+  if (!isConnected) {
+    connectToWhatsApp();
+    res.json({ message: "Reconnection initiated" });
+  } else {
+    res.json({ message: "Already connected" });
+  }
+});
+
+// Error handling
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
+  savePersistentData();
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  savePersistentData();
 });
 
+// Load persistent data on startup
+loadPersistentData();
+
+// Start the server
 app.listen(PORT, () => {
   console.log(`🚀 WhatsApp bot server listening on port ${PORT}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`📊 Stats: http://localhost:${PORT}/stats`);
+});
+
+// Start WhatsApp connection
+console.log("🚀 Starting WhatsApp client for Termux...");
+connectToWhatsApp().catch(err => {
+  console.error('❌ Failed to connect to WhatsApp:', err);
 });
