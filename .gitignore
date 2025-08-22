@@ -1,4 +1,58 @@
-node_modules/*
+# Dependencies
+node_modules/
 package-lock.json
-.wwebjs_auth
-.wwebjs_cache
+
+# WhatsApp Web.js authentication and cache
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Baileys authentication data
+auth_info_baileys/
+
+# Bot runtime files
+.bot.pid
+bot.log
+
+# Bot data directory (may contain sensitive information)
+bot_data/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Temporary folders
+tmp/
+temp/
