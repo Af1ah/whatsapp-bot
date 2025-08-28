@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 // Configuration
 const AI_API_URL = process.env.AI_API_URL || "admin-dash.webvantic.studio/api/whatsapp";
@@ -49,6 +49,8 @@ let sock;
 let qrGenerated = false;
 let reconnectAttempts = 0;
 let isConnected = false;
+let currentQR = null;
+let lastQRTime = null;
 
 // Persistent data structures
 let pendingMessages = new Map();
@@ -418,50 +420,63 @@ async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
+      console.log("🔄 [WhatsApp] Connection update:", { connection, hasQR: !!qr });
       
       if (qr && !qrGenerated) {
+        console.log("📱 [WhatsApp] QR code generated - displaying...");
         console.log("📱 Scan this QR code to log in:");
         qrcode.generate(qr, { small: true });
         qrGenerated = true;
+        currentQR = qr;
+        lastQRTime = new Date();
+        console.log("📱 [WhatsApp] QR code stored for API access");
         console.log("⏳ Waiting for QR scan...");
       }
       
       if (connection === 'close') {
         isConnected = false;
         qrGenerated = false;
+        currentQR = null;
+        lastQRTime = null;
         
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         
-        console.log('🔌 Connection closed:', {
+        console.log('🔌 [WhatsApp] Connection closed:', {
           reason: lastDisconnect?.error?.output?.payload?.message || 'Unknown',
           statusCode: statusCode,
-          willReconnect: shouldReconnect
+          willReconnect: shouldReconnect,
+          attempts: reconnectAttempts
         });
         
         if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
           reconnectAttempts++;
-          console.log(`🔄 Reconnecting in ${RECONNECT_DELAY/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+          console.log(`🔄 [WhatsApp] Reconnecting in ${RECONNECT_DELAY/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
           setTimeout(connectToWhatsApp, RECONNECT_DELAY);
         } else if (statusCode === DisconnectReason.loggedOut) {
-          console.log('❌ Logged out, please restart the bot and scan QR again');
+          console.log('❌ [WhatsApp] Logged out, please restart the bot and scan QR again');
           process.exit(1);
         } else {
-          console.log('❌ Max reconnection attempts reached');
+          console.log('❌ [WhatsApp] Max reconnection attempts reached');
           process.exit(1);
         }
       } else if (connection === 'open') {
         isConnected = true;
         reconnectAttempts = 0;
         qrGenerated = false;
+        currentQR = null;
+        lastQRTime = null;
         
-        console.log('✅ WhatsApp bot is ready!');
-        console.log('🤖 Bot info:', sock.user);
+        console.log('✅ [WhatsApp] WhatsApp bot is ready!');
+        console.log('🤖 [WhatsApp] Bot info:', sock.user);
         
         // Send pending messages after connection
-        setTimeout(sendPendingMessages, 2000);
+        setTimeout(() => {
+          console.log("📤 [WhatsApp] Sending pending messages after connection...");
+          sendPendingMessages();
+        }, 2000);
       } else if (connection === 'connecting') {
-        console.log('🔄 Connecting to WhatsApp...');
+        console.log('🔄 [WhatsApp] Connecting to WhatsApp...');
       }
     });
 
@@ -496,7 +511,22 @@ async function connectToWhatsApp() {
 // Express server for monitoring and control
 app.use(express.json());
 
+// CORS middleware for frontend
+app.use((req, res, next) => {
+  console.log(`📡 [API] ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ [API] OPTIONS request handled for ${req.path}`);
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.get("/", (req, res) => {
+  console.log("📊 [API] Root endpoint accessed");
   res.json({
     status: "✅ WhatsApp bot server running",
     aiApiUrl: AI_API_URL,
@@ -511,16 +541,20 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({
+  console.log("🏥 [API] Health check requested");
+  const healthData = {
     status: "healthy",
     whatsappReady: isConnected,
     botUser: sock?.user || null,
     timestamp: new Date().toISOString()
-  });
+  };
+  console.log("🏥 [API] Health data:", healthData);
+  res.json(healthData);
 });
 
 app.get("/stats", (req, res) => {
-  res.json({
+  console.log("📊 [API] Stats requested");
+  const statsData = {
     connected: isConnected,
     pendingMessages: pendingMessages.size,
     activeMessageTimers: userMessageTimers.size,
@@ -528,26 +562,118 @@ app.get("/stats", (req, res) => {
     reconnectAttempts: reconnectAttempts,
     uptime: process.uptime(),
     memoryUsage: process.memoryUsage()
+  };
+  console.log("📊 [API] Stats data:", {
+    ...statsData,
+    memoryUsage: {
+      ...statsData.memoryUsage,
+      heapUsed: `${(statsData.memoryUsage.heapUsed / 1024 / 1024).toFixed(1)}MB`
+    }
+  });
+  res.json(statsData);
+});
+
+// QR Code endpoint
+app.get("/qr", (req, res) => {
+  console.log("📱 [API] QR code requested");
+  console.log("📱 [API] Current state - connected:", isConnected, "hasQR:", !!currentQR, "lastQRTime:", lastQRTime);
+  
+  if (isConnected) {
+    console.log("⚠️ [API] QR request denied - bot already connected");
+    return res.status(400).json({ 
+      error: "Bot is already connected",
+      connected: true 
+    });
+  }
+  
+  if (currentQR && lastQRTime) {
+    // Check if QR is still valid (QR codes typically expire after 60 seconds)
+    const qrAge = Date.now() - lastQRTime.getTime();
+    console.log("📱 [API] QR age:", qrAge, "ms");
+    if (qrAge < 60000) { // 60 seconds - more reasonable time
+      console.log("✅ [API] Returning valid QR code");
+      return res.json({
+        qr: currentQR,
+        timestamp: lastQRTime.toISOString(),
+        expiresIn: Math.max(0, 60000 - qrAge)
+      });
+    } else {
+      console.log("⏰ [API] QR code expired, clearing it");
+      currentQR = null;
+      lastQRTime = null;
+    }
+  }
+  
+  console.log("❌ [API] No valid QR code available");
+  return res.status(404).json({ 
+    error: "No QR code available. Bot might be connecting or already connected.",
+    connected: isConnected,
+    hasQR: !!currentQR
   });
 });
 
 // Manual trigger endpoints
 app.post("/send-pending", async (req, res) => {
+  console.log("📤 [API] Send pending messages requested");
   if (!isConnected) {
+    console.log("❌ [API] Send pending denied - bot not connected");
     return res.status(503).json({ error: "Bot not connected" });
   }
   
+  console.log("📤 [API] Sending", pendingMessages.size, "pending messages");
   await sendPendingMessages();
+  console.log("✅ [API] Pending messages sent successfully");
   res.json({ message: "Pending messages sent" });
 });
 
 app.post("/reconnect", (req, res) => {
+  console.log("🔌 [API] Reconnect requested");
+  console.log("🔌 [API] Current connection state:", isConnected);
   if (!isConnected) {
+    console.log("🔄 [API] Initiating reconnection...");
     connectToWhatsApp();
     res.json({ message: "Reconnection initiated" });
   } else {
+    console.log("✅ [API] Already connected - no action needed");
     res.json({ message: "Already connected" });
   }
+});
+
+// Refresh QR endpoint
+app.post("/refresh-qr", (req, res) => {
+  console.log("🔄 [API] QR refresh requested");
+  console.log("🔄 [API] Current connection state:", isConnected);
+  
+  if (isConnected) {
+    console.log("⚠️ [API] QR refresh denied - bot already connected");
+    return res.status(400).json({ 
+      error: "Bot is already connected",
+      connected: true 
+    });
+  }
+  
+  // Clear current QR and force new generation
+  console.log("🗑️ [API] Clearing current QR to force new generation");
+  currentQR = null;
+  lastQRTime = null;
+  
+  // Trigger reconnection to generate new QR
+  console.log("🔄 [API] Triggering reconnection for new QR");
+  connectToWhatsApp();
+  
+  res.json({ message: "QR refresh initiated" });
+});
+
+// Force restart endpoint
+app.post("/restart", (req, res) => {
+  console.log("🔄 [API] Bot restart requested");
+  res.json({ message: "Bot restart initiated" });
+  console.log("🔄 [API] Manual restart requested via API");
+  savePersistentData();
+  setTimeout(() => {
+    console.log("🛑 [API] Exiting process for restart");
+    process.exit(0);
+  }, 1000);
 });
 
 // Error handling
