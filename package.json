@@ -2,10 +2,10 @@
   "name": "whatsapp-bot-termux",
   "version": "1.0.0",
   "description": "WhatsApp bot for Termux using Baileys",
-  "main": "bot.js",
+  "main": "whatsapp-bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node whatsapp-bot.js",
+    "dev": "nodemon whatsapp-bot.js"
   },
   "keywords": ["whatsapp", "bot", "termux", "baileys"],
   "author": "Your Name",
