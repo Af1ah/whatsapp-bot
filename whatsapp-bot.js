@@ -6,6 +6,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
+const { handleVoiceMessage, testVoiceAPI } = require('./voice-integration');
 const express = require('express');
 const axios = require('axios');
 const qrcode = require('qrcode-terminal');
@@ -470,6 +471,14 @@ async function connectToWhatsApp() {
         console.log('✅ [WhatsApp] WhatsApp bot is ready!');
         console.log('🤖 [WhatsApp] Bot info:', sock.user);
         
+        // Test voice API
+        const voiceApiHealthy = await testVoiceAPI();
+        if (voiceApiHealthy) {
+          console.log('🎤 [Voice] Voice API is ready!');
+        } else {
+          console.log('⚠️ [Voice] Voice API not available - voice messages will not work');
+        }
+        
         // Send pending messages after connection
         setTimeout(() => {
           console.log("📤 [WhatsApp] Sending pending messages after connection...");
@@ -486,6 +495,14 @@ async function connectToWhatsApp() {
       if (type !== 'notify') return;
       
       for (const message of messages) {
+        // Check for voice messages first
+        if (message.message?.audioMessage?.ptt) {
+          console.log("🎤 Voice message detected, handling with voice integration...");
+          await handleVoiceMessage(message, sock);
+          continue; // Don't process as regular message
+        }
+        
+        // Handle regular text messages
         await handleIncomingMessage(message);
       }
     });
