@@ -23,7 +23,7 @@ const path = require('path');
 
 // Voice API Configuration
 const VOICE_API_CONFIG = {
-  BASE_URL: 'http://localhost:3000', // Update this to your Gemini server URL
+  BASE_URL: 'https://admin-dash.webvantic.studio', // Your hosted Gemini server URL
   ENDPOINTS: {
     VOICE: '/api/whatsapp/voice',
     VOICE_TEST: '/api/whatsapp/voice/test'
