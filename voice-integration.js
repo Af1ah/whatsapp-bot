@@ -98,6 +98,28 @@ async function processVoiceMessage(voiceInfo, options = {}) {
   const config = { ...VOICE_API_CONFIG, ...options };
   let attempt = 0;
   
+  // Validate input
+  if (!voiceInfo || !voiceInfo.audioBuffer || !voiceInfo.phoneNumber) {
+    console.error("❌ Invalid voice info provided:", voiceInfo);
+    return {
+      success: false,
+      error: 'Invalid voice message data',
+      messageId: voiceInfo?.messageId || 'unknown'
+    };
+  }
+  
+  // Check audio buffer size
+  if (voiceInfo.audioBuffer.length < 1024) { // Less than 1KB
+    console.error("❌ Audio file too small:", voiceInfo.audioBuffer.length, "bytes");
+    return {
+      success: false,
+      error: 'Voice message too short. Please record at least 2 seconds of audio.',
+      messageId: voiceInfo.messageId
+    };
+  }
+  
+  console.log(`🎤 Processing voice message: ${voiceInfo.audioBuffer.length} bytes, ${voiceInfo.mimeType}`);
+  
   while (attempt < config.MAX_RETRIES) {
     try {
       console.log(`🔄 Processing voice message (attempt ${attempt + 1}/${config.MAX_RETRIES})`);
@@ -121,7 +143,7 @@ async function processVoiceMessage(voiceInfo, options = {}) {
             ...formData.getHeaders(),
           },
           timeout: config.TIMEOUT,
-          responseType: 'arraybuffer' // For voice responses
+          responseType: 'json' // Changed from 'arraybuffer' to handle JSON responses properly
         }
       );
 
@@ -132,24 +154,45 @@ async function processVoiceMessage(voiceInfo, options = {}) {
         responseType: response.headers['x-response-type']
       });
 
-      // Check if response is voice or text
+      // Check if response is voice or text based on content type
+      const contentType = response.headers['content-type'] || '';
       const responseType = response.headers['x-response-type'];
       const transcription = response.headers['x-transcription'] 
         ? decodeURIComponent(response.headers['x-transcription']) 
         : undefined;
 
-      if (responseType === 'voice') {
-        // Voice response
+      if (responseType === 'voice' || contentType.includes('audio/')) {
+        // Voice response - convert back to arraybuffer
+        let audioBuffer;
+        if (Buffer.isBuffer(response.data)) {
+          audioBuffer = response.data;
+        } else {
+          audioBuffer = Buffer.from(response.data);
+        }
+        
         return {
           success: true,
           type: 'voice',
           transcription,
-          audioBuffer: Buffer.from(response.data),
+          audioBuffer,
           messageId: voiceInfo.messageId
         };
       } else {
-        // Text response (fallback)
-        let responseText = response.data.toString();
+        // Text response (JSON)
+        let responseText = '';
+        
+        if (typeof response.data === 'string') {
+          responseText = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          // Handle streaming response or regular JSON
+          if (response.data.response) {
+            responseText = response.data.response;
+          } else if (response.data.message) {
+            responseText = response.data.message;
+          } else {
+            responseText = JSON.stringify(response.data);
+          }
+        }
         
         // Parse streaming response if needed
         if (responseText.includes('data:')) {
@@ -182,17 +225,57 @@ async function processVoiceMessage(voiceInfo, options = {}) {
 
     } catch (error) {
       attempt++;
-      console.error(`❌ Voice processing attempt ${attempt} failed:`, error.message);
+      console.error(`❌ Voice processing attempt ${attempt} failed:`);
+      
+      // Extract detailed error information
+      let errorMessage = 'Voice processing failed';
+      let errorDetails = {};
+      
+      if (error.response) {
+        // API responded with error status
+        errorDetails = {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        };
+        
+        // Extract specific error message from API response
+        if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data?.error) {
+          errorMessage = error.response.data.error;
+        }
+        
+        console.error('API Error Response:', errorDetails);
+      } else if (error.request) {
+        // Network error
+        errorMessage = 'Network error - could not connect to voice API';
+        errorDetails = {
+          code: error.code,
+          message: error.message
+        };
+        console.error('Network Error:', errorDetails);
+      } else {
+        // Other error
+        errorMessage = error.message;
+        errorDetails = {
+          message: error.message,
+          stack: error.stack
+        };
+        console.error('General Error:', errorDetails);
+      }
       
       if (attempt >= config.MAX_RETRIES) {
+        console.error(`❌ All ${config.MAX_RETRIES} attempts failed. Final error:`, errorMessage);
         return {
           success: false,
-          error: error.response?.data?.message || error.message || 'Voice processing failed',
+          error: errorMessage,
           messageId: voiceInfo.messageId
         };
       }
       
       // Wait before retry
+      console.log(`⏳ Waiting ${config.RETRY_DELAY}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, config.RETRY_DELAY));
     }
   }
@@ -302,9 +385,21 @@ async function handleVoiceMessage(msg, sock) {
       }
       
     } else {
-      // Send error message
-      const errorMessage = result.error || "Sorry, I couldn't process your voice message. Please try again.";
-      await sock.sendMessage(jid, { text: `❌ ${errorMessage}` });
+      // Send error message with more specific feedback
+      let userErrorMessage = result.error || "Sorry, I couldn't process your voice message. Please try again.";
+      
+      // Provide more user-friendly error messages
+      if (userErrorMessage.includes('too short') || userErrorMessage.includes('2 seconds')) {
+        userErrorMessage = "🎤 Your voice message was too short. Please record for at least 2 seconds and try again.";
+      } else if (userErrorMessage.includes('Network error') || userErrorMessage.includes('connect')) {
+        userErrorMessage = "🌐 I'm having trouble connecting to my voice processing service. Please try again in a moment.";
+      } else if (userErrorMessage.includes('audio format') || userErrorMessage.includes('Unsupported')) {
+        userErrorMessage = "🔧 Your audio format isn't supported. Please try recording again.";
+      } else if (userErrorMessage.includes('transcribe') || userErrorMessage.includes('understand')) {
+        userErrorMessage = "🎧 I couldn't understand your voice message clearly. Please try speaking more clearly or check your audio quality.";
+      }
+      
+      await sock.sendMessage(jid, { text: userErrorMessage });
       console.log(`❌ Voice message processing failed for ${voiceInfo.phoneNumber}: ${result.error}`);
     }
 
